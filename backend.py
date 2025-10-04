@@ -36,6 +36,7 @@ def add_new_item():
     if not all(key in new_item for key in required_keys):
         abort(400, 'Missing required fields: id, name , owner_id')
 
+    ITEMS_DATA.append(new_item)
     return jsonify({
         "message": "Item added successffuly",
         "item" : new_item

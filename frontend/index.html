@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask API Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better visibility */
+        .item-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s;
+        }
+        .item-card:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8 font-sans">
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center py-6 bg-white shadow-lg rounded-xl mb-8">
+            <h1 class="text-4xl font-extrabold text-indigo-700">Decoupled Flask API Client</h1>
+            <p class="text-gray-500 mt-2">Interact with your running Python backend on port 5000</p>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- 1. GET By User ID -->
+            <div class="bg-white p-6 rounded-xl shadow-md lg:col-span-1 h-fit">
+                <h2 class="text-2xl font-semibold text-indigo-600 mb-4">1. Fetch Items by User ID (GET)</h2>
+                <div class="space-y-4">
+                    <input type="text" id="userIdInput" value="user_a" placeholder="Enter User ID (e.g., user_a)" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    <button onclick="fetchUserItems()" 
+                            class="w-full bg-indigo-500 text-white py-2 rounded-lg hover:bg-indigo-600 transition duration-150">
+                        Fetch User Items
+                    </button>
+                    <button onclick="fetchAllItems()" 
+                            class="w-full bg-gray-400 text-white py-2 rounded-lg hover:bg-gray-500 transition duration-150">
+                        Show All Items
+                    </button>
+                </div>
+                <div id="resultsById" class="mt-4 p-4 border border-indigo-200 bg-indigo-50 rounded-lg text-sm">
+                    <p class="text-indigo-700">Results will appear here.</p>
+                </div>
+            </div>
+
+            <!-- 2. POST New Item -->
+            <div class="bg-white p-6 rounded-xl shadow-md lg:col-span-2 h-fit">
+                <h2 class="text-2xl font-semibold text-green-600 mb-4">2. Add New Item (POST)</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <input type="number" id="itemId" placeholder="Item ID (e.g., 401)" value="401"
+                           class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                    <input type="text" id="itemName" placeholder="Item Name (e.g., Mug)" value="Mug"
+                           class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                    <input type="text" id="itemOwnerId" placeholder="Owner ID (e.g., user_d)" value="user_d"
+                           class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                </div>
+                <button onclick="postNewItem()" 
+                        class="w-full mt-4 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 transition duration-150 font-medium">
+                    POST New Item
+                </button>
+                <div id="postStatus" class="mt-4 p-4 border border-green-200 bg-green-50 rounded-lg text-sm hidden">
+                    <p class="text-green-700 font-semibold">Status: Waiting...</p>
+                </div>
+            </div>
+
+            <!-- 3. Results Display -->
+            <div class="lg:col-span-3 bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4" id="resultsTitle">All Items / Search Results</h2>
+                <div id="generalResults" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <p class="text-gray-500">Use the buttons above to fetch data or add a new item.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration: MUST match your Flask server address
+        const BASE_URL = "http://127.0.0.1:5000"; 
+
+        /**
+         * Renders the fetched list of items into the specified result container.
+         * @param {Array} items - Array of item objects.
+         * @param {string} title - Title for the results section.
+         * @param {string} targetId - ID of the container element to update.
+         */
+        function renderItems(items, title, targetId = 'generalResults') {
+            const container = document.getElementById(targetId);
+            document.getElementById('resultsTitle').textContent = title;
+
+            if (!items || items.length === 0) {
+                container.innerHTML = `<p class="text-gray-500">No items found.</p>`;
+                return;
+            }
+
+            const html = items.map(item => `
+                <div class="item-card bg-white p-4 rounded-lg border border-gray-200">
+                    <p class="text-lg font-bold text-indigo-700">Item ID: ${item.id}</p>
+                    <p class="text-gray-800">Name: ${item.name}</p>
+                    <p class="text-gray-600">Owner: <span class="font-mono bg-gray-100 px-1 rounded">${item.owner_id}</span></p>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        }
+
+        /**
+         * Handles the GET /api/items/users call to fetch all data.
+         */
+        async function fetchAllItems() {
+            const url = `${BASE_URL}/api/items/users`;
+            const resultsContainer = document.getElementById('generalResults');
+            resultsContainer.innerHTML = '<p class="text-gray-500 animate-pulse">Fetching all items...</p>';
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const items = await response.json();
+                renderItems(items, `All ${items.length} Items in Database`);
+            } catch (error) {
+                resultsContainer.innerHTML = `<p class="text-red-600 font-semibold">Error fetching all data: ${error.message}. Check server logs.</p>`;
+                console.error('Fetch All Error:', error);
+            }
+        }
+
+        /**
+         * Handles the GET /api/items/<user_id> call.
+         */
+        async function fetchUserItems() {
+            const userId = document.getElementById('userIdInput').value.trim();
+            const resultsContainer = document.getElementById('generalResults');
+            const statusContainer = document.getElementById('resultsById');
+            
+            statusContainer.innerHTML = `<p class="text-indigo-700 animate-pulse">Requesting items for ${userId}...</p>`;
+
+            const url = `${BASE_URL}/api/items/${userId}`;
+
+            try {
+                const response = await fetch(url);
+                
+                if (response.status === 404) {
+                    const errorJson = await response.json();
+                    resultsContainer.innerHTML = `<p class="text-orange-600 font-semibold">Status 404: No items found for user ID '${userId}'.</p>`;
+                    statusContainer.innerHTML = `<p class="text-orange-600">Request complete: 404 Not Found.</p>`;
+                    renderItems([], `Search Results for "${userId}"`);
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const items = await response.json();
+                statusContainer.innerHTML = `<p class="text-green-600">Request successful: 200 OK. Found ${items.length} items.</p>`;
+                renderItems(items, `Search Results for "${userId}"`);
+
+            } catch (error) {
+                statusContainer.innerHTML = `<p class="text-red-600 font-semibold">NETWORK ERROR: Is Flask server running at ${BASE_URL}?</p>`;
+                console.error('Fetch User Items Error:', error);
+            }
+        }
+
+        /**
+         * Handles the POST /api/items call to add a new item.
+         */
+        async function postNewItem() {
+            const statusDiv = document.getElementById('postStatus');
+            statusDiv.classList.remove('hidden');
+            statusDiv.className = 'mt-4 p-4 border border-blue-200 bg-blue-50 rounded-lg text-sm';
+            statusDiv.innerHTML = '<p class="text-blue-700 font-semibold animate-pulse">Sending POST request...</p>';
+
+            const newItem = {
+                id: parseInt(document.getElementById('itemId').value),
+                name: document.getElementById('itemName').value,
+                owner_id: document.getElementById('itemOwnerId').value
+            };
+
+            // Basic client-side validation
+            if (isNaN(newItem.id) || !newItem.name || !newItem.owner_id) {
+                statusDiv.className = 'mt-4 p-4 border border-red-400 bg-red-100 rounded-lg text-sm';
+                statusDiv.innerHTML = '<p class="text-red-800 font-semibold">Client Error: All fields must be filled out!</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/items`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newItem)
+                });
+
+                const responseData = await response.json();
+
+                if (response.status === 201) {
+                    statusDiv.className = 'mt-4 p-4 border border-green-400 bg-green-100 rounded-lg text-sm';
+                    statusDiv.innerHTML = `
+                        <p class="text-green-800 font-semibold">Success! Status 201 Created.</p>
+                        <p class="text-green-800">${responseData.message}</p>
+                        <p class="mt-2 text-sm">Now fetching all items to show the update...</p>
+                    `;
+                    // On successful creation, fetch all items to update the main display
+                    fetchAllItems(); 
+                } else if (response.status === 400) {
+                    // Handles the server's 400 Bad Request (Missing JSON/fields)
+                    statusDiv.className = 'mt-4 p-4 border border-red-400 bg-red-100 rounded-lg text-sm';
+                    statusDiv.innerHTML = `<p class="text-red-800 font-semibold">Error 400 Bad Request:</p><p class="text-red-800">${responseData.description || responseData.message}</p>`;
+                } else {
+                    statusDiv.className = 'mt-4 p-4 border border-yellow-400 bg-yellow-100 rounded-lg text-sm';
+                    statusDiv.innerHTML = `<p class="text-yellow-800 font-semibold">Unexpected Error ${response.status}:</p><p class="text-yellow-800">${JSON.stringify(responseData)}</p>`;
+                }
+
+            } catch (error) {
+                statusDiv.className = 'mt-4 p-4 border border-red-400 bg-red-100 rounded-lg text-sm';
+                statusDiv.innerHTML = `<p class="text-red-800 font-semibold">NETWORK ERROR: Could not connect to API.</p>`;
+                console.error('POST Error:', error);
+            }
+        }
+        
+        // Initial load to show all current items
+        window.onload = fetchAllItems;
+    </script>
+</body>
+</html>
